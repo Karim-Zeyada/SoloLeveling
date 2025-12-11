@@ -55,7 +55,7 @@ class ScanConfig:
 @dataclass(frozen=True)
 class CameraConfig:
     """Camera configuration."""
-    EASE_SPEED: ClassVar[float] = 0.15
+    EASE_SPEED: ClassVar[float] = 0.05
     ZOOM: ClassVar[float] = 0.25
 
 
@@ -75,8 +75,8 @@ ENEMY_CONFIGS: dict[str, EnemyConfig] = {
     'security_agent': EnemyConfig(
         name='Security Agent',
         asset='enemy',
-        health=3,
-        damage=1,
+        health=30,
+        damage=5,
         speed=0.5,
         detection_range=8,
         armor=0,
@@ -85,22 +85,22 @@ ENEMY_CONFIGS: dict[str, EnemyConfig] = {
     'elf': EnemyConfig(
         name='Elf Archer',
         asset='elf',
-        health=5,
-        damage=2,
+        health=20,
+        damage=12,
         speed=0.35,
         detection_range=10,
         armor=1,
-        description='Strongest enemy - high damage and range'
+        description='Glass cannon - high damage, fragile'
     ),
     'alpha_bear': EnemyConfig(
         name='Alpha Bear',
         asset='alpha_bear',
-        health=7,
-        damage=1,
+        health=80,
+        damage=8,
         speed=0.45,
         detection_range=6,
         armor=2,
-        description='Tanky threat - slow but durable'
+        description='Tank - slow but extremely durable'
     ),
 }
 
@@ -108,29 +108,29 @@ SHADOW_CONFIGS: dict[str, ShadowConfig] = {
     'shadow': ShadowConfig(
         name='Shadow Agent',
         asset='shadow',
-        health=5,
-        damage=2,
+        health=40,
+        damage=5,
         speed=0.4,
-        cost=10,
-        description='Basic shadow servant - loyal companion'
+        cost=15,
+        description='Infantry - weak alone, strong in numbers'
     ),
     'igris': ShadowConfig(
         name='Igris',
         asset='igris',
-        health=8,
-        damage=3,
+        health=60,
+        damage=15,
         speed=0.3,
-        cost=25,
+        cost=40,
         description='Elite shadow warrior - swift and deadly'
     ),
     'beru': ShadowConfig(
         name='Beru',
         asset='beru',
-        health=6,
-        damage=2,
+        health=50,
+        damage=20,
         speed=0.35,
-        cost=20,
-        description='Versatile shadow - balanced power'
+        cost=50,
+        description='Assassin - highest damage output'
     ),
 }
 

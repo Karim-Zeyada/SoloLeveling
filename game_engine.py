@@ -118,21 +118,60 @@ class GameEngine:
             return
         
         logger.info("Initializing level %d", level_num)
+    
+        # Procedural map generation
+        from systems.procgen import CellularAutomataGenerator
+        # Make map bigger for more exploration
+        gen_width = int(config.grid_size * 1.5)
+        gen_height = int(config.grid_size * 1.5)
         
-        self.grid = Grid(config.grid_size, config.grid_size, level=level_num)
-        self.grid.place_resources(config.resource_count)
-        self.grid.place_exit()
+        generator = CellularAutomataGenerator(gen_width, gen_height)
+        layout = generator.generate(wall_prob=0.38, iterations=3)
         
-        self.player = Player(2, 2)
+        self.grid = Grid(gen_width, gen_height, level=level_num, layout=layout)
+        
+        # Use largest region for spawning
+        largest_region = generator.largest_region if generator.largest_region else []
+        
+        # Player spawns near top-left of region
+        if largest_region:
+            # Sort by distance from (2,2) to find a good starting spot
+            sorted_by_start = sorted(largest_region, key=lambda p: (p[0]**2 + p[1]**2))
+            spawn_x, spawn_y = sorted_by_start[0]
+        else:
+            spawn_x, spawn_y = 2, 2
+        
+        self.player = Player(spawn_x, spawn_y)
         self.player.resources = config.start_resources
         
-        # Create enemies
+        # Exit spawns at farthest point from player in the region
+        if largest_region:
+            sorted_by_dist = sorted(largest_region, key=lambda p: abs(p[0]-spawn_x) + abs(p[1]-spawn_y), reverse=True)
+            exit_x, exit_y = sorted_by_dist[0]
+            exit_tile = self.grid.get_tile(exit_x, exit_y)
+            if exit_tile:
+                exit_tile.type = 'exit'
+        else:
+            self.grid.place_exit()
+        
+        # Place resources in the connected region
+        self.grid.place_resources(config.resource_count)
+        
+        # Create enemies in the connected region (far from player)
         self.enemies = []
         enemy_index = 0
+        enemy_spawn_candidates = sorted(largest_region, key=lambda p: abs(p[0]-spawn_x) + abs(p[1]-spawn_y), reverse=True) if largest_region else []
+        
         for enemy_type, count in config.enemies:
             for i in range(count):
-                ex = self.grid.width - 3 - enemy_index * 2
-                ey = self.grid.height - 3 - enemy_index * 2
+                if enemy_spawn_candidates:
+                    # Pick from far end of region
+                    idx = min(enemy_index * 5, len(enemy_spawn_candidates) - 1)
+                    ex, ey = enemy_spawn_candidates[idx]
+                else:
+                    ex = self.grid.width - 3 - enemy_index * 2
+                    ey = self.grid.height - 3 - enemy_index * 2
+                
                 enemy = Enemy(ex, ey, enemy_type=enemy_type)
                 self.enemies.append(enemy)
                 enemy_index += 1

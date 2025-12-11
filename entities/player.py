@@ -22,6 +22,11 @@ class Player:
         self.y: int | float = y
         self.resources: int = 10  # Starting 'Data'
         
+        # Combat stats (Hell Mode)
+        self.health: int = 100
+        self.max_health: int = 100
+        self.damage: int = 25
+        
         # Movement interpolation state (for smooth movement)
         self.moving: bool = False
         self.move_start: tuple[int | float, int | float] = (x, y)

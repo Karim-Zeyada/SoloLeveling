@@ -7,15 +7,26 @@ from .tile import Tile
 class Grid:
     """Game level grid with procedural generation."""
     
-    def __init__(self, width, height, level=1):
+    def __init__(self, width, height, level=1, layout=None):
         self.width = width
         self.height = height
         self.level = level
         self.tiles = [[Tile(x, y) for y in range(height)] for x in range(width)]
-        self.generate_level()
+        
+        if layout:
+            self._apply_layout(layout)
+        else:
+            self.generate_level()
+            
+    def _apply_layout(self, layout):
+        """Apply layout grid (True=Wall, False=Floor)."""
+        for x in range(min(self.width, len(layout))):
+            for y in range(min(self.height, len(layout[0]))):
+                if layout[x][y]:
+                    self.get_tile(x, y).type = 'wall'
     
     def generate_level(self):
-        """Generate level layout with obstacles, resources, and exit."""
+        """Simple random generation (fallback)."""
         # Add some random walls for obstacle variety
         num_walls = max(3, self.width // 4)
         for _ in range(num_walls):

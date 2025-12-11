@@ -56,7 +56,7 @@ TILE_HEIGHT = 369
 ELEVATION_OFFSET = 150
 
 # --- Camera Settings ---
-CAMERA_EASE_SPEED = 0.15  # Lerp factor per frame (0-1, lower = smoother)
+CAMERA_EASE_SPEED = 0.05  # Lerp factor per frame (0-1, lower = smoother)
 CAMERA_ZOOM = 0.25  # Zoom factor: scale the tiles down for visibility
 
 # --- Enemy Type Registry ---
