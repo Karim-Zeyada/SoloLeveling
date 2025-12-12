@@ -6,7 +6,7 @@ import pygame
 import math
 import time
 from config.settings import MAX_LEVELS, RESPONSIVE_SCALE, SHADOW_TYPES
-from config.constants import WHITE, CYAN
+from config.constants import WHITE, CYAN, GREEN, RED
 
 
 class HUD:
@@ -41,7 +41,7 @@ class HUD:
         
         # Calculate HUD dimensions
         hud_width = max(320, int(380 * RESPONSIVE_SCALE))
-        hud_height = 6 * line_height + padding * 2 + 30
+        hud_height = 7 * line_height + padding * 2 + 35  # Increased height
         hud_x = 10
         hud_y = 10
         
@@ -63,6 +63,27 @@ class HUD:
         level_surf = self.title_font.render(level_text, True, self.TEXT_ACCENT)
         screen.blit(level_surf, (hud_x + padding, y))
         y += line_height + 5
+        
+        # Player Health Bar
+        bar_width = hud_width - (padding * 2)
+        bar_height = 12
+        hp_percent = player.health / player.max_health
+        
+        # BG
+        pygame.draw.rect(screen, RED, (hud_x + padding, y, bar_width, bar_height))
+        # Fill
+        pygame.draw.rect(screen, GREEN, (hud_x + padding, y, int(bar_width * hp_percent), bar_height))
+        # Border
+        pygame.draw.rect(screen, WHITE, (hud_x + padding, y, bar_width, bar_height), 1)
+        
+        # HP Text overlay (e.g. 100/100)
+        hp_text = f"{int(player.health)}/{player.max_health}"
+        hp_surf = self.small_font.render(hp_text, True, WHITE)
+        # Center text
+        hp_rect = hp_surf.get_rect(center=(hud_x + hud_width // 2, y + bar_height // 2))
+        screen.blit(hp_surf, hp_rect)
+        
+        y += line_height
         
         # Separator line
         pygame.draw.line(screen, (50, 60, 80), 
@@ -98,8 +119,8 @@ class HUD:
                         (hud_x + hud_width - padding, y - 2), 1)
         y += 8
         
-        controls1 = "ARROWS: Move  |  SPACE: Scan"
-        controls2 = "B: Wall  |  T: Trap  |  R: Arise"
+        controls1 = "ARROWS/WASD: Move | Q: Slash"
+        controls2 = "R-Click: Dagger | R: Arise | B: Wall"
         
         ctrl1_surf = self.small_font.render(controls1, True, self.TEXT_SECONDARY)
         ctrl2_surf = self.small_font.render(controls2, True, self.TEXT_SECONDARY)

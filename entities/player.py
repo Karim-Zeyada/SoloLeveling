@@ -34,6 +34,25 @@ class Player:
         self.move_progress: float = 0.0
         self.move_duration: float = 0.12  # seconds per tile
         self.path: list[tuple[int, int]] = []
+        
+        # Combat logic
+        self.attack_cooldown: float = 0.0
+        self.damage_animation_timer: float = 0.0
+        
+    @property
+    def is_dead(self) -> bool:
+        return self.health <= 0
+        
+    def take_damage(self, damage: int) -> int:
+        """Take damage and return actual damage dealt."""
+        self.health -= damage
+        if self.health < 0:
+            self.health = 0
+            
+        # Trigger damage flash
+        self.damage_animation_timer = 0.15
+        
+        return damage
     
     def move(self, dx: int, dy: int, grid: 'Grid') -> bool:
         """
@@ -87,6 +106,75 @@ class Player:
                         logger.info("Data Collected! Resources: %d", self.resources)
                     elif tile.type == 'exit':
                         logger.info("LEVEL COMPLETE - UPLOAD SUCCESSFUL")
+        
+        # Cooldown management
+        if self.attack_cooldown > 0:
+            self.attack_cooldown -= dt
+            
+        # Animation timer
+        if self.damage_animation_timer > 0:
+            self.damage_animation_timer -= dt
+            
+    def attack(self, enemies: list) -> list:
+        """
+        Perform melee attack on adjacent enemies.
+        
+        Args:
+            enemies: List of active enemies
+            
+        Returns:
+            List of enemies hit
+        """
+        if self.attack_cooldown > 0:
+            return []
+            
+        self.attack_cooldown = 0.5
+        hit_enemies = []
+        
+        for enemy in enemies:
+            # Check distance (adjacent or diagonal = ~1.414)
+            dist = ((self.x - enemy.x)**2 + (self.y - enemy.y)**2)**0.5
+            if dist <= 1.5:
+                enemy.take_damage(self.damage)
+                hit_enemies.append(enemy)
+                
+        return hit_enemies
+        
+    def skill_dagger_throw(self, target_pos: tuple[int, int], enemies: list):
+        """
+        Perform ranged dagger throw at target position.
+        
+        Args:
+            target_pos: Tuple (x, y) of target tile
+            enemies: List of active enemies
+            
+        Returns:
+            Enemy hit or None
+        """
+        if self.attack_cooldown > 0:
+            return None
+            
+        self.attack_cooldown = 1.0
+        
+        tx, ty = target_pos
+        
+        for enemy in enemies:
+            # Check distance to target tile (relaxed hit detection)
+            dist_to_target = ((enemy.x - tx)**2 + (enemy.y - ty)**2)**0.5
+            
+            # Revised logic:
+            # 1. Check if enemy is close to target_pos (hit radius)
+            # 2. Check if enemy is within range of player
+            
+            if dist_to_target < 1.0:
+                 # Range check (max 4.5 tiles)
+                dist_p = ((self.x - enemy.x)**2 + (self.y - enemy.y)**2)**0.5
+                if dist_p <= 4.5:  # Slightly increased range
+                    damage = self.damage * 2  # Double damage skill
+                    enemy.take_damage(damage)
+                    return enemy
+                    
+        return None
     
     def start_move_to(self, tx: int, ty: int, grid: 'Grid') -> bool:
         """

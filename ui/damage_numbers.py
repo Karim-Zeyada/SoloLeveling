@@ -11,7 +11,7 @@ class DamageNumber:
     """A floating damage number that fades and rises."""
     x: float
     y: float
-    damage: int
+    amount: int | str
     color: tuple[int, int, int]
     lifetime: float = 1.0
     age: float = 0.0
@@ -34,7 +34,7 @@ class DamageNumberManager:
     
     Usage:
         manager = DamageNumberManager()
-        manager.add(world_x, world_y, damage=5, color=(255, 0, 0))
+        manager.add(world_x, world_y, amount=5, color=(255, 0, 0))
         manager.update(dt)
         manager.render(screen, camera, world_offset)
     """
@@ -52,11 +52,11 @@ class DamageNumberManager:
         self, 
         x: float, 
         y: float, 
-        damage: int, 
+        amount: int | str, 
         color: tuple[int, int, int] = (255, 100, 100)
     ) -> None:
-        """Add a damage number at world position."""
-        self.numbers.append(DamageNumber(x=x, y=y, damage=damage, color=color))
+        """Add a damage number or text at world position."""
+        self.numbers.append(DamageNumber(x=x, y=y, amount=amount, color=color))
     
     def update(self, dt: float) -> None:
         """Update all damage numbers."""
@@ -83,7 +83,13 @@ class DamageNumberManager:
             sy = iso_y + world_offset[1] + camera.y
             
             # Render with alpha
-            text = self.font.render(f"-{num.damage}", True, num.color)
+            # Render with alpha
+            if isinstance(num.amount, str):
+                msg = num.amount
+            else:
+                msg = f"-{num.amount}"
+                
+            text = self.font.render(msg, True, num.color)
             text.set_alpha(num.alpha)
             
             # Center the text

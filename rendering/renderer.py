@@ -32,12 +32,6 @@ class Renderer:
                 if tile.visible:
                     self._render_tile_object(screen, tile, sx, sy)
                     
-                    # Draw entity paths (debug)
-                    for enemy in enemies:
-                        if (x, y) in enemy.path:
-                            pts = [(sx + 32, sy), (sx + 64, sy + 16), (sx + 32, sy + 32), (sx, sy + 16)]
-                            pygame.draw.polygon(screen, (255, 0, 0, 100), pts, 2)
-                
                 # Draw entities
                 if tile.visible:
                     # Draw player
@@ -65,6 +59,37 @@ class Renderer:
                 # Path preview
                 if (x, y) in self.preview_path:
                     self._render_path_preview(screen, sx, sy)
+        
+        # Render enemy paths (debug visualization)
+        self._render_enemy_paths(screen, enemies, camera, world_offset)
+    
+    def _render_enemy_paths(self, screen, enemies, camera, world_offset):
+        """Render path lines for all enemies."""
+        for enemy in enemies:
+            if not enemy.path:
+                continue
+                
+            # Start from enemy current position
+            start_iso = camera.cart_to_iso(enemy.x, enemy.y)
+            start_pt = (
+                start_iso[0] + world_offset[0] + camera.x + 32,
+                start_iso[1] + world_offset[1] + camera.y + 16
+            )
+            
+            points = [start_pt]
+            
+            for (nx, ny) in enemy.path:
+                iso = camera.cart_to_iso(nx, ny)
+                pt = (
+                    iso[0] + world_offset[0] + camera.x + 32,
+                    iso[1] + world_offset[1] + camera.y + 16
+                )
+                points.append(pt)
+            
+            if len(points) > 1:
+                pygame.draw.lines(screen, (255, 0, 0), False, points, 2)
+                for pt in points:
+                     pygame.draw.circle(screen, (255, 0, 0), (int(pt[0]), int(pt[1])), 3)
     
     def _render_floor(self, screen, sx, sy):
         """Render floor tile."""
@@ -168,9 +193,15 @@ class Renderer:
             player_img = self.assets.images['player']
             p_scaled_width = int(player_img.get_width() * CAMERA_ZOOM)
             p_scaled_height = int(player_img.get_height() * CAMERA_ZOOM)
+            
             if p_scaled_width > 0 and p_scaled_height > 0:
                 player_scaled = pygame.transform.scale(player_img, (p_scaled_width, p_scaled_height))
+                
+                # Damage flash check (Player doesn't have timer yet, skip for now or add if needed)
                 screen.blit(player_scaled, (p_sx, p_sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
+                
+                # Draw Player Health Bar
+                self._render_health_bar(screen, p_sx, p_sy, player.health, player.max_health, p_scaled_width, GREEN)
     
     def _render_enemy(self, screen, enemy, sx, sy):
         """Render enemy with health bar."""
@@ -179,23 +210,21 @@ class Renderer:
             enemy_img = self.assets.images[enemy_asset_key]
             e_scaled_width = int(enemy_img.get_width() * CAMERA_ZOOM)
             e_scaled_height = int(enemy_img.get_height() * CAMERA_ZOOM)
+            
             if e_scaled_width > 0 and e_scaled_height > 0:
                 enemy_scaled = pygame.transform.scale(enemy_img, (e_scaled_width, e_scaled_height))
-                screen.blit(enemy_scaled, (sx, sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
                 
-                # Draw health bar above enemy
-                health_percent = max(0, enemy.health / enemy.max_health)
-                bar_width = int(e_scaled_width * 0.8)
-                bar_height = int(6 * RESPONSIVE_SCALE)
-                bar_x = sx + e_scaled_width // 2 - bar_width // 2
-                bar_y = sy - int(ELEVATION_OFFSET * CAMERA_ZOOM) - int(15 * RESPONSIVE_SCALE)
+                # Damage flash
+                if hasattr(enemy, 'damage_animation_timer') and enemy.damage_animation_timer > 0:
+                    # Create white silhouette
+                    flash_surf = enemy_scaled.copy()
+                    flash_surf.fill((255, 255, 255, 200), special_flags=pygame.BLEND_RGBA_MULT)
+                    screen.blit(flash_surf, (sx, sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
+                else:
+                    screen.blit(enemy_scaled, (sx, sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
                 
-                # Background (red)
-                pygame.draw.rect(screen, RED, (bar_x, bar_y, bar_width, bar_height))
-                # Health (green)
-                pygame.draw.rect(screen, GREEN, (bar_x, bar_y, int(bar_width * health_percent), bar_height))
-                # Border
-                pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_width, bar_height), 1)
+                # Draw health bar
+                self._render_health_bar(screen, sx, sy, enemy.health, enemy.max_health, e_scaled_width, RED)
     
     def _render_shadow(self, screen, shadow, sx, sy):
         """Render shadow with health bar."""
@@ -204,23 +233,38 @@ class Renderer:
             shadow_img = self.assets.images[shadow_asset_key]
             s_scaled_width = int(shadow_img.get_width() * CAMERA_ZOOM)
             s_scaled_height = int(shadow_img.get_height() * CAMERA_ZOOM)
+            
             if s_scaled_width > 0 and s_scaled_height > 0:
                 shadow_scaled = pygame.transform.scale(shadow_img, (s_scaled_width, s_scaled_height))
-                screen.blit(shadow_scaled, (sx, sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
                 
-                # Draw shadow health bar
-                health_percent = max(0, shadow.health / shadow.max_health)
-                bar_width = int(s_scaled_width * 0.8)
-                bar_height = int(6 * RESPONSIVE_SCALE)
-                bar_x = sx + s_scaled_width // 2 - bar_width // 2
-                bar_y = sy - int(ELEVATION_OFFSET * CAMERA_ZOOM) - int(15 * RESPONSIVE_SCALE)
+                # Damage flash
+                if hasattr(shadow, 'damage_animation_timer') and shadow.damage_animation_timer > 0:
+                    flash_surf = shadow_scaled.copy()
+                    flash_surf.fill((255, 255, 255, 200), special_flags=pygame.BLEND_RGBA_MULT)
+                    screen.blit(flash_surf, (sx, sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
+                else:
+                    screen.blit(shadow_scaled, (sx, sy - int(ELEVATION_OFFSET * CAMERA_ZOOM)))
                 
-                # Background (red)
-                pygame.draw.rect(screen, RED, (bar_x, bar_y, bar_width, bar_height))
-                # Health (cyan for shadow)
-                pygame.draw.rect(screen, CYAN, (bar_x, bar_y, int(bar_width * health_percent), bar_height))
-                # Border
-                pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_width, bar_height), 1)
+                # Draw health bar
+                self._render_health_bar(screen, sx, sy, shadow.health, shadow.max_health, s_scaled_width, GREEN)
+
+    def _render_health_bar(self, screen, sx, sy, current, max_hp, sprite_width, fill_color):
+        """Helper to render standardized health bar."""
+        bar_width = 40
+        bar_height = 6
+        health_percent = max(0, min(1, current / max_hp))
+        
+        # Centered above sprite
+        bar_x = sx + sprite_width // 2 - bar_width // 2
+        bar_y = sy - int(ELEVATION_OFFSET * CAMERA_ZOOM) - 15
+        
+        # Background (Black)
+        pygame.draw.rect(screen, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+        # Fill
+        if health_percent > 0:
+            pygame.draw.rect(screen, fill_color, (bar_x, bar_y, int(bar_width * health_percent), bar_height))
+        # Border (White)
+        pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_width, bar_height), 1)
     
     def _render_fog(self, screen, sx, sy):
         """Render fog of war."""

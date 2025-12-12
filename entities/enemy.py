@@ -57,6 +57,7 @@ class Enemy(BaseEntity):
         # Combat state
         self.caught_player = False
         self.combat_timer = 0.0
+        self.attack_cooldown = 0.0
         
         # Patrol state
         self.patrol_points: list[tuple[int, int]] = []
@@ -100,10 +101,15 @@ class Enemy(BaseEntity):
             if (patrol_x, patrol_y) not in self.patrol_points:
                 self.patrol_points.append((patrol_x, patrol_y))
     
-    def update(self, player: 'Player', grid: 'Grid', pathfinding: 'Pathfinding') -> None:
+    def update(self, dt: float, player: 'Player', grid: 'Grid', pathfinding: 'Pathfinding') -> None:
         """Update enemy AI and movement."""
+        super().update(dt)
         if self.is_dead:
             return
+            
+        # Update cooldowns
+        if self.attack_cooldown > 0:
+            self.attack_cooldown -= dt
         
         # Update status effects (timers decrease even if not moving logic yet)
         # But we do it in move_step or here? Usually update loop controls time.
@@ -113,27 +119,44 @@ class Enemy(BaseEntity):
         # Wait, update receives dt? No, it receives player, grid, pathfinding.
         # move_step receives dt.
         pass
+    
+    def attack_player(self, player: 'Player') -> int:
+        """
+        Attack the player if cooldown allows.
+        Returns damage dealt (0 if on cooldown).
+        """
+        if self.attack_cooldown > 0:
+            return 0
+            
+        damage = player.take_damage(self.damage)
+        self.attack_cooldown = 1.0  # 1 second cooldown
+        return damage
 
         # Manhattan distance check for detection
         dist = abs(self.x - player.x) + abs(self.y - player.y)
         
         if dist < self.detection_range:
             # Player detected - hunt them!
-            self.state = "HUNTING"
-            # Logic check: if frozen, maybe don't calculate path? 
-            # Actually, we can calculate, but just not move.
+            if self.state != "HUNTING":
+                logger.info("%s spotted player at dist %.1f! Switching to HUNTING", self.type_name, dist)
+                self.state = "HUNTING"
             
-            # Only recalculate path if not frozen to save perf? 
-            # Or just let it be.
+            # Recalculate path
             self.path = pathfinding.a_star(
-                (self.x, self.y), 
+                (int(self.x), int(self.y)), 
                 (int(player.x), int(player.y)), 
                 grid
             )
+            # Log heavily to debug "not moving"
+            if len(self.path) > 0:
+                logger.info("%s path calculated. Steps: %d. Next: %s", self.type_name, len(self.path), self.path[0])
+            else:
+                 logger.warning("%s detected player but NO PATH found!", self.type_name)
         else:
             # No player nearby - patrol
             if self.state == "HUNTING":
                 # Just lost the player, return to patrol
+                logger.info("%s lost player (dist %.1f). Switching to PATROL", self.type_name, dist)
                 self.state = "PATROL"
                 self.path = []
             
@@ -195,11 +218,14 @@ class Enemy(BaseEntity):
         super().move_step(current_dt)
     
     def check_caught_player(self, player: 'Player') -> bool:
-        """Check if enemy has caught the player."""
+        """Check if enemy has caught (is adjacent to) the player."""
         if self.is_dead:
             return False
-        # If frozen, cannot catch? Maybe logically yes.
+        # If frozen, cannot attack
         if self.frozen_timer > 0:
             return False
             
-        return int(player.x) == self.x and int(player.y) == self.y
+        # Manhattan distance check
+        dist = abs(self.x - player.x) + abs(self.y - player.y)
+        # Allow attack if adjacent (distance 1) or on same tile (distance 0)
+        return dist <= 1.5

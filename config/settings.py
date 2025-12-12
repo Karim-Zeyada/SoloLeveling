@@ -5,14 +5,11 @@ Contains all game constants, registries, and configuration values.
 import subprocess
 
 # --- Game Story Context ---
-GAME_TITLE = "System Override: Digital Architect"
+GAME_TITLE = "Solo Leveling: Monarch's Descent"
 GAME_STORY = """
-You are a rogue AI navigating a corporate firewall.
-Collect DATA nodes (resources) to strengthen your presence.
-Build FIREWALLS to block SECURITY AGENTS (enemies).
-Plant TRAPS to delay pursuers.
-Reach the EXIT to access the next system layer.
-Complete all levels to escape corporate surveillance.
+SYSTEM ALERT: The Dungeon is evolving. Enemy ranks have escalated.
+Shadow Soldiers cannot hold the line alone. You must join the fray.
+Use 'Q' to Slash and 'Right Click' to throw Daggers.
 """
 
 # --- Screen Configuration ---

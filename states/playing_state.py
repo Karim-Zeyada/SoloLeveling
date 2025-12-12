@@ -7,7 +7,7 @@ import pygame
 
 from .base_state import BaseState
 from core.state_machine import StateType
-from config import BuildCosts, get_level_config
+from config import BuildCosts, get_level_config, GRAY
 from core.logger import get_logger
 
 if TYPE_CHECKING:
@@ -93,10 +93,19 @@ class PlayingState(BaseState):
                 self._dismiss_shadow()
             elif event.key == pygame.K_f:
                 self._toggle_shadow_attack()
+
+            # Combat commands
+            elif event.key == pygame.K_z or event.key == pygame.K_q:
+                self._perform_melee_attack()
+            elif event.key == pygame.K_x:
+                self._perform_skill_attack_key()
         
-        # Mouse click - pathfinding movement
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self._handle_mouse_click(event.pos)
+        # Mouse click
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Left Click - Move
+                self._handle_mouse_click(event.pos)
+            elif event.button == 3:  # Right Click - Skill
+                self._perform_skill_attack_mouse(event.pos)
         
         # Mouse movement - update hover tile
         if event.type == pygame.MOUSEMOTION:
@@ -117,13 +126,22 @@ class PlayingState(BaseState):
         # Update enemies
         self.engine.enemy_timer += dt
         for enemy in self.engine.enemies:
-            enemy.update(self.engine.player, self.engine.grid, self.engine.pathfinding)
-            if self.engine.enemy_timer > 0.1:
-                enemy.move_step(dt)
+            enemy.update(dt, self.engine.player, self.engine.grid, self.engine.pathfinding)
+            enemy.move_step(dt)
             
             # Check if caught
             if enemy.check_caught_player(self.engine.player):
-                return StateType.GAME_OVER
+                dmg = enemy.attack_player(self.engine.player)
+                if dmg > 0:
+                    self.engine.damage_manager.add(
+                        self.engine.player.x, self.engine.player.y, 
+                        dmg, color=(200, 0, 0)
+                    )
+                    logger.info("Enemy %s hit player for %d damage", enemy.type_name, dmg)
+                    
+                    # Check player death
+                    if self.engine.player.is_dead:
+                        return StateType.GAME_OVER
         
         if self.engine.enemy_timer > 0.1:
             self.engine.enemy_timer = 0.0
@@ -264,6 +282,78 @@ class PlayingState(BaseState):
         """Toggle all shadows to attack mode."""
         for shadow in self.engine.shadows:
             shadow.state = "ATTACK" if shadow.state == "IDLE" else "IDLE"
+
+    def _perform_melee_attack(self) -> None:
+        """Execute player melee attack."""
+        hits = self.engine.player.attack(self.engine.enemies)
+        if hits:
+            self.engine.sounds.play('build')  # Reuse build sound
+            for enemy in hits:
+                # Visual effect
+                self.engine.combat_manager.add_slash(enemy.x, enemy.y)
+                
+                # Add damage number
+                self.engine.damage_manager.add(
+                    enemy.x, enemy.y, 
+                    self.engine.player.damage, 
+                    color=(255, 50, 50)
+                )
+                logger.info("Player hit %s for %d damage (HP: %d)", 
+                          enemy.type_name, self.engine.player.damage, enemy.health)
+
+    def _perform_skill_attack_key(self) -> None:
+        """Execute player ranged skill attack (Key binding)."""
+        target_pos = self.engine.renderer.hover_tile
+        if not target_pos:
+            return
+        self._execute_skill_at(target_pos)
+
+    def _perform_skill_attack_mouse(self, pos: tuple[int, int]) -> None:
+        """Execute player ranged skill attack (Mouse click)."""
+        # Convert screen pos to grid pos
+        from config import TILE_WIDTH, TILE_HEIGHT
+        
+        mx, my = pos
+        world_offset = self.engine.camera.get_world_offset(
+            self.screen_width, self.screen_height
+        )
+        world_x = mx - world_offset[0] - self.engine.camera.x
+        world_y = my - world_offset[1] - self.engine.camera.y
+        fx = world_x / (TILE_WIDTH / 2)
+        fy = world_y / (TILE_HEIGHT / 2)
+        gx = int(round((fx + fy) / 2))
+        gy = int(round((fy - fx) / 2))
+        
+        self._execute_skill_at((gx, gy))
+
+    def _execute_skill_at(self, target_pos: tuple[int, int]) -> None:
+        """Helper to run skill logic."""
+        hit_enemy = self.engine.player.skill_dagger_throw(target_pos, self.engine.enemies)
+        if hit_enemy:
+            self.engine.sounds.play('build')
+            
+            # Impact effect
+            self.engine.combat_manager.add_slash(hit_enemy.x, hit_enemy.y)
+            
+            # Add damage number (Crit)
+            self.engine.damage_manager.add(
+                hit_enemy.x, hit_enemy.y, 
+                self.engine.player.damage * 2, 
+                color=(255, 0, 0),
+                is_crit=True
+            )
+            logger.info("Player SKILL hit %s for %d damage (HP: %d)", 
+                      hit_enemy.type_name, self.engine.player.damage * 2, hit_enemy.health)
+        else:
+            # Miss feedback
+            target_grid_x, target_grid_y = target_pos
+            self.engine.damage_manager.add(
+                target_grid_x, target_grid_y, 
+                "MISS", 
+                color=GRAY
+            )
+            # Optional: play 'swish' sound if available
+            # self.engine.sounds.play('swing')
     
     def _check_trap_triggers(self) -> None:
         """Check if any enemies are standing on traps and trigger damage."""

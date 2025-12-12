@@ -117,6 +117,7 @@ class BaseEntity:
         
         # State tracking
         self.state: str = "IDLE"
+        self.damage_animation_timer: float = 0.0
     
     # Health properties (for backward compatibility)
     @property
@@ -167,7 +168,10 @@ class BaseEntity:
     
     def take_damage(self, damage: int) -> int:
         """Take damage and return actual damage dealt."""
-        return self._health.take_damage(damage)
+        dmg = self._health.take_damage(damage)
+        if dmg > 0:
+            self.damage_animation_timer = 0.15  # Flash white for 0.15s
+        return dmg
     
     def move_step(self, dt: float) -> None:
         """Move one step along the path if timer allows."""
@@ -180,7 +184,8 @@ class BaseEntity:
     
     def update(self, dt: float, *args, **kwargs) -> None:
         """Override in subclasses for entity-specific update logic."""
-        pass
+        if self.damage_animation_timer > 0:
+            self.damage_animation_timer -= dt
     
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(x={self.x}, y={self.y}, health={self.health}/{self.max_health})"
