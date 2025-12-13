@@ -42,7 +42,7 @@ class Pathfinding:
         return revealed_tiles
     
     @staticmethod
-    def a_star(start, goal, grid_obj):
+    def a_star(start, goal, grid_obj, ignore_fog=True):
         """
         A* pathfinding algorithm.
         Returns path from start to goal as list of coordinates.
@@ -71,6 +71,10 @@ class Pathfinding:
                     
                     # Logic: Cannot walk through walls
                     if tile.type == 'wall':
+                        continue
+                        
+                    # Logic: Cannot walk through fog if not ignoring it
+                    if not ignore_fog and not tile.visible:
                         continue
                         
                     new_cost = cost_so_far[current] + tile.cost

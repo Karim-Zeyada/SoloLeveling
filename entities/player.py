@@ -71,7 +71,7 @@ class Player:
         
         if 0 <= new_x < grid.width and 0 <= new_y < grid.height:
             tile = grid.get_tile(new_x, new_y)
-            if tile and tile.type != 'wall':
+            if tile and tile.type != 'wall' and tile.visible:
                 # Start interpolated movement rather than teleport
                 if not self.moving:
                     self.moving = True

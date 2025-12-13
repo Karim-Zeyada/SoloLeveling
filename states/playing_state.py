@@ -392,10 +392,15 @@ class PlayingState(BaseState):
         gy = int(round((fy - fx) / 2))
         
         if 0 <= gx < self.engine.grid.width and 0 <= gy < self.engine.grid.height:
+            tile = self.engine.grid.get_tile(gx, gy)
+            if not tile or not tile.visible:
+                return
+
             path = self.engine.pathfinding.a_star(
                 (int(self.engine.player.x), int(self.engine.player.y)), 
                 (gx, gy), 
-                self.engine.grid
+                self.engine.grid,
+                ignore_fog=False
             )
             if path:
                 self.engine.player.path = path
@@ -429,13 +434,20 @@ class PlayingState(BaseState):
         
         # Update renderer's hover tile
         if 0 <= gx < self.engine.grid.width and 0 <= gy < self.engine.grid.height:
+            tile = self.engine.grid.get_tile(gx, gy)
+            if not tile or not tile.visible:
+                self.engine.renderer.hover_tile = None
+                self.engine.renderer.preview_path = []
+                return
+
             self.engine.renderer.hover_tile = (gx, gy)
             
             # Calculate preview path
             path = self.engine.pathfinding.a_star(
                 (int(self.engine.player.x), int(self.engine.player.y)),
                 (gx, gy),
-                self.engine.grid
+                self.engine.grid,
+                ignore_fog=False
             )
             self.engine.renderer.preview_path = path if path else []
         else:
