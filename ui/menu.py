@@ -203,7 +203,7 @@ class MenuScreens:
         pygame.draw.rect(box_surf, (50, 60, 80), (0, 0, box_width, box_height), 1, border_radius=5)
         screen.blit(box_surf, (center_x - box_width // 2, box_y))
         
-        # Story text
+        # Story text - centered in box
         y = box_y + box_padding
         for i, line in enumerate(story_lines):
             # Fade in effect based on index
@@ -214,7 +214,8 @@ class MenuScreens:
                 int(self.TEXT_BRIGHT[2] * (alpha / 255))
             )
             text = self.body_font.render(line, True, color)
-            screen.blit(text, (center_x - box_width // 2 + box_padding, y))
+            text_rect = text.get_rect(center=(center_x, y + line_height // 2))
+            screen.blit(text, text_rect)
             y += line_height
         
         # Animated start button

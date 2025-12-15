@@ -12,6 +12,47 @@ class Renderer:
         self.assets = assets
         self.hover_tile: tuple[int, int] | None = None
         self.preview_path: list[tuple[int, int]] = []  # Path preview tiles
+        
+        # BFS Animation state
+        self.bfs_layers: list[list[tuple[int, int]]] = []  # Tiles grouped by BFS distance
+        self.bfs_animation_timer: float = 0.0
+        self.bfs_current_layer: int = 0
+        self.bfs_layer_delay: float = 0.15  # Seconds between each layer reveal
+        self.bfs_active: bool = False
+        self.bfs_revealed_tiles: set[tuple[int, int]] = set()  # Track revealed for glow effect
+    
+    def start_bfs_animation(self, layers: list[list[tuple[int, int]]]) -> None:
+        """Start BFS wave animation with given layers."""
+        self.bfs_layers = layers
+        self.bfs_animation_timer = 0.0
+        self.bfs_current_layer = 0
+        self.bfs_active = True
+        self.bfs_revealed_tiles = set()
+    
+    def update_bfs_animation(self, dt: float, grid) -> None:
+        """Update BFS animation state, revealing tiles layer by layer."""
+        if not self.bfs_active:
+            return
+            
+        self.bfs_animation_timer += dt
+        
+        # Reveal layers based on time
+        while (self.bfs_current_layer < len(self.bfs_layers) and 
+               self.bfs_animation_timer >= self.bfs_layer_delay * self.bfs_current_layer):
+            # Reveal this layer's tiles
+            for (tx, ty) in self.bfs_layers[self.bfs_current_layer]:
+                tile = grid.get_tile(tx, ty)
+                if tile:
+                    tile.visible = True
+                self.bfs_revealed_tiles.add((tx, ty))
+            self.bfs_current_layer += 1
+        
+        # Animation complete
+        if self.bfs_current_layer >= len(self.bfs_layers):
+            # Keep glow effect for a moment after completion
+            if self.bfs_animation_timer > self.bfs_layer_delay * len(self.bfs_layers) + 0.5:
+                self.bfs_active = False
+                self.bfs_revealed_tiles.clear()
     
     def render_game(self, screen, grid, player, enemies, shadows, camera, screen_width, screen_height):
         """Render the main game viewport."""
@@ -59,9 +100,49 @@ class Renderer:
                 # Path preview
                 if (x, y) in self.preview_path:
                     self._render_path_preview(screen, sx, sy)
+                
+                # BFS wave glow effect
+                if (x, y) in self.bfs_revealed_tiles:
+                    self._render_bfs_glow(screen, sx, sy)
         
         # Render enemy paths (debug visualization)
         self._render_enemy_paths(screen, enemies, camera, world_offset)
+        
+        # Render BFS wave label if active
+        if self.bfs_active:
+            self._render_bfs_label(screen, screen_width)
+    
+    def _render_bfs_glow(self, screen, sx, sy):
+        """Render cyan glow for BFS revealed tiles."""
+        half_w = int(TILE_WIDTH * CAMERA_ZOOM / 2)
+        half_h = int(TILE_HEIGHT * CAMERA_ZOOM / 2)
+        center_x = sx + half_w
+        center_y = sy + half_h
+        
+        # Draw glowing diamond
+        glow_surf = pygame.Surface((half_w * 2, half_h * 2), pygame.SRCALPHA)
+        local_points = [
+            (half_w, 0),
+            (half_w * 2, half_h),
+            (half_w, half_h * 2),
+            (0, half_h),
+        ]
+        pygame.draw.polygon(glow_surf, (0, 255, 255, 80), local_points)  # Cyan fill
+        pygame.draw.polygon(glow_surf, (0, 255, 255, 200), local_points, 3)  # Bright border
+        screen.blit(glow_surf, (center_x - half_w, center_y - half_h))
+    
+    def _render_bfs_label(self, screen, screen_width):
+        """Render BFS algorithm label during animation."""
+        font = pygame.font.Font(None, 36)
+        layer_text = f"BFS SCAN - Layer {self.bfs_current_layer}/{len(self.bfs_layers)}"
+        text_surf = font.render(layer_text, True, (0, 255, 255))
+        text_rect = text_surf.get_rect(center=(screen_width // 2, 50))
+        
+        # Background
+        bg_rect = text_rect.inflate(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=5)
+        pygame.draw.rect(screen, (0, 200, 200), bg_rect, 2, border_radius=5)
+        screen.blit(text_surf, text_rect)
     
     def _render_enemy_paths(self, screen, enemies, camera, world_offset):
         """

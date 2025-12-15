@@ -7,9 +7,9 @@ import subprocess
 # --- Game Story Context ---
 GAME_TITLE = "Solo Leveling: Monarch's Descent"
 GAME_STORY = """
-SYSTEM ALERT: The Dungeon is evolving. Enemy ranks have escalated.
-Shadow Soldiers cannot hold the line alone. You must join the fray.
-Use 'Q' to Slash and 'Right Click' to throw Daggers.
+SYSTEM: Breach detected. Collect DATA nodes.
+Avoid or eliminate hostiles using A* tracking.
+SPACE: Scan | WASD: Move | Q: Attack | R: Summon
 """
 
 # --- Screen Configuration ---

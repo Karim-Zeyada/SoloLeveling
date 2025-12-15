@@ -123,6 +123,9 @@ class PlayingState(BaseState):
             nx, ny = self.engine.player.path.pop(0)
             self.engine.player.start_move_to(nx, ny, self.engine.grid)
         
+        # Update BFS animation
+        self.engine.renderer.update_bfs_animation(dt, self.engine.grid)
+        
         # Update enemies
         self.engine.enemy_timer += dt
         for enemy in self.engine.enemies:
@@ -238,15 +241,14 @@ class PlayingState(BaseState):
     
     # Private helper methods
     def _perform_scan(self) -> None:
-        """Perform BFS scan to reveal tiles around player."""
-        revealed = self.engine.pathfinding.bfs_scan(
-            (self.engine.player.x, self.engine.player.y), 
+        """Perform animated BFS scan to reveal tiles around player."""
+        # Use layered BFS for wave animation
+        layers = self.engine.pathfinding.bfs_scan_layered(
+            (int(self.engine.player.x), int(self.engine.player.y)), 
             self.engine.grid, radius=5
         )
-        for rx, ry in revealed:
-            tile = self.engine.grid.get_tile(rx, ry)
-            if tile:
-                tile.visible = True
+        # Start the animation in renderer
+        self.engine.renderer.start_bfs_animation(layers)
     
     def _build_action(self, type_str: str) -> None:
         """Build wall at player position."""

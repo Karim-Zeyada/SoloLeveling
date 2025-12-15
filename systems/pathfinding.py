@@ -42,6 +42,47 @@ class Pathfinding:
         return revealed_tiles
     
     @staticmethod
+    def bfs_scan_layered(start_pos, grid_obj, radius=5):
+        """
+        BFS scan that returns tiles grouped by distance (layers).
+        Used for animated wave visualization of BFS algorithm.
+        
+        Returns:
+            list[list[tuple]]: List of layers, each containing tiles at that distance
+        """
+        queue = collections.deque([start_pos])
+        visited = set([start_pos])
+        distances = {start_pos: 0}
+        
+        # Group tiles by distance
+        layers = [[] for _ in range(radius + 1)]
+        layers[0].append(start_pos)
+        
+        while queue:
+            current = queue.popleft()
+            current_dist = distances[current]
+            
+            if current_dist >= radius:
+                continue
+            
+            cx, cy = current
+            neighbors = [
+                (cx+1, cy), (cx-1, cy), (cx, cy+1), (cx, cy-1)
+            ]
+            
+            for nx, ny in neighbors:
+                if 0 <= nx < grid_obj.width and 0 <= ny < grid_obj.height:
+                    if (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        new_dist = current_dist + 1
+                        distances[(nx, ny)] = new_dist
+                        queue.append((nx, ny))
+                        if new_dist <= radius:
+                            layers[new_dist].append((nx, ny))
+        
+        return layers
+    
+    @staticmethod
     def a_star(start, goal, grid_obj):
         """
         A* pathfinding algorithm.
