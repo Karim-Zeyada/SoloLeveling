@@ -238,6 +238,11 @@ class PlayingState(BaseState):
             screen, self.screen_width, self.screen_height,
             self.engine.player.resources
         )
+        
+        # Render AI stats panel (top-right)
+        self.engine.renderer.render_ai_stats_panel(
+            screen, self.engine.enemies, self.screen_width
+        )
     
     # Private helper methods
     def _perform_scan(self) -> None:

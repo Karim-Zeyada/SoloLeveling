@@ -156,6 +156,10 @@ class Renderer:
             # Draw state indicator above enemy
             self._render_enemy_state(screen, enemy, camera, world_offset)
             
+            # Draw patrol route (always visible as dashed green)
+            self._render_patrol_route(screen, enemy, camera, world_offset)
+            
+            # Draw current path (A* path to target)
             if not enemy.path:
                 continue
                 
@@ -256,6 +260,119 @@ class Renderer:
         bg_rect = text_rect.inflate(6, 4)
         pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
         screen.blit(text_surf, text_rect)
+    
+    def _render_patrol_route(self, screen, enemy, camera, world_offset):
+        """
+        Render enemy patrol route as green dashed lines.
+        Shows the AI patrol behavior pattern.
+        """
+        patrol_points = getattr(enemy, 'patrol_points', [])
+        if len(patrol_points) < 2:
+            return
+        
+        # Only show patrol route when not hunting (or always show as background info)
+        patrol_color = (100, 200, 100)  # Green for patrol
+        
+        # Convert patrol points to screen coordinates
+        screen_points = []
+        for (px, py) in patrol_points:
+            iso = camera.cart_to_iso(px, py)
+            pt = (
+                iso[0] + world_offset[0] + camera.x + 32,
+                iso[1] + world_offset[1] + camera.y + 16
+            )
+            screen_points.append(pt)
+        
+        # Draw dashed lines between patrol points
+        for i in range(len(screen_points)):
+            start = screen_points[i]
+            end = screen_points[(i + 1) % len(screen_points)]  # Loop back to first
+            self._draw_dashed_line(screen, start, end, patrol_color, 2, 8)
+        
+        # Draw patrol waypoint markers
+        for i, pt in enumerate(screen_points):
+            # Draw numbered circle marker
+            pygame.draw.circle(screen, patrol_color, (int(pt[0]), int(pt[1])), 8)
+            pygame.draw.circle(screen, (0, 0, 0), (int(pt[0]), int(pt[1])), 8, 1)
+            
+            # Draw waypoint number
+            font = pygame.font.Font(None, 16)
+            num_surf = font.render(str(i + 1), True, (0, 0, 0))
+            num_rect = num_surf.get_rect(center=(int(pt[0]), int(pt[1])))
+            screen.blit(num_surf, num_rect)
+    
+    def _draw_dashed_line(self, screen, start, end, color, width, dash_length):
+        """Draw a dashed line between two points."""
+        import math
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = math.sqrt(dx*dx + dy*dy)
+        if length == 0:
+            return
+        
+        dx, dy = dx/length, dy/length
+        num_dashes = int(length / (dash_length * 2))
+        
+        for i in range(num_dashes + 1):
+            dash_start_dist = i * dash_length * 2
+            dash_end_dist = min(dash_start_dist + dash_length, length)
+            
+            dash_start = (start[0] + dx * dash_start_dist, start[1] + dy * dash_start_dist)
+            dash_end = (start[0] + dx * dash_end_dist, start[1] + dy * dash_end_dist)
+            
+            pygame.draw.line(screen, color, dash_start, dash_end, width)
+    
+    def render_ai_stats_panel(self, screen, enemies, screen_width):
+        """
+        Render AI algorithm stats panel showing the 'AI thinking' process.
+        Shows A* metrics, enemy states, and algorithm info.
+        """
+        # Panel dimensions
+        panel_width = 280
+        panel_height = 160
+        panel_x = screen_width - panel_width - 10
+        panel_y = 10
+        
+        # Draw panel background
+        panel_surf = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        pygame.draw.rect(panel_surf, (15, 20, 30, 220), (0, 0, panel_width, panel_height), border_radius=8)
+        pygame.draw.rect(panel_surf, (0, 200, 200), (0, 0, panel_width, panel_height), 2, border_radius=8)
+        screen.blit(panel_surf, (panel_x, panel_y))
+        
+        # Fonts
+        title_font = pygame.font.Font(None, 24)
+        body_font = pygame.font.Font(None, 18)
+        
+        # Title
+        title = title_font.render("AI ALGORITHM STATS", True, (0, 220, 255))
+        screen.blit(title, (panel_x + 10, panel_y + 8))
+        
+        # Separator
+        pygame.draw.line(screen, (50, 100, 120), 
+                        (panel_x + 10, panel_y + 32), 
+                        (panel_x + panel_width - 10, panel_y + 32), 1)
+        
+        y = panel_y + 40
+        line_height = 20
+        
+        # Calculate stats
+        hunting_count = sum(1 for e in enemies if e.state == "HUNTING")
+        patrol_count = sum(1 for e in enemies if e.state == "PATROL")
+        total_path_nodes = sum(len(e.path) for e in enemies)
+        
+        # Stats lines
+        stats = [
+            (f"Enemies Tracking (A*): {hunting_count}", (255, 100, 100) if hunting_count > 0 else (150, 150, 150)),
+            (f"Enemies Patrolling: {patrol_count}", (100, 200, 100)),
+            (f"Total Path Nodes: {total_path_nodes}", (200, 200, 200)),
+            (f"Algorithm: A* Pathfinding", (0, 200, 200)),
+            (f"Heuristic: Manhattan Distance", (0, 200, 200)),
+        ]
+        
+        for stat_text, color in stats:
+            stat_surf = body_font.render(stat_text, True, color)
+            screen.blit(stat_surf, (panel_x + 10, y))
+            y += line_height
     
     def _draw_arrow_head(self, screen, start, end, color):
         """Draw arrow head pointing from start to end."""
