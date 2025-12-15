@@ -53,10 +53,14 @@ class DamageNumberManager:
         x: float, 
         y: float, 
         amount: int | str, 
-        color: tuple[int, int, int] = (255, 100, 100)
+        color: tuple[int, int, int] = (255, 100, 100),
+        is_crit: bool = False
     ) -> None:
         """Add a damage number or text at world position."""
-        self.numbers.append(DamageNumber(x=x, y=y, amount=amount, color=color))
+        num = DamageNumber(x=x, y=y, amount=amount, color=color)
+        if is_crit:
+            num.lifetime = 1.5  # Longer display time
+        self.numbers.append(num)
     
     def update(self, dt: float) -> None:
         """Update all damage numbers."""

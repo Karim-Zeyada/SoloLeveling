@@ -111,14 +111,35 @@ class Enemy(BaseEntity):
         if self.attack_cooldown > 0:
             self.attack_cooldown -= dt
         
-        # Update status effects (timers decrease even if not moving logic yet)
-        # But we do it in move_step or here? Usually update loop controls time.
-        # Let's handle timers here if they are not movement related, but freeze stops movement.
+        # Manhattan distance check for detection
+        dist = abs(self.x - player.x) + abs(self.y - player.y)
         
-        # We will handle timers in move_step where dt is passed often, or expected to be passed.
-        # Wait, update receives dt? No, it receives player, grid, pathfinding.
-        # move_step receives dt.
-        pass
+        if dist < self.detection_range:
+            # Player detected - hunt them!
+            if self.state != "HUNTING":
+                logger.info("%s spotted player at dist %.1f! Switching to HUNTING", self.type_name, dist)
+                self.state = "HUNTING"
+            
+            # Recalculate path using A* algorithm
+            self.path = pathfinding.a_star(
+                (int(self.x), int(self.y)), 
+                (int(player.x), int(player.y)), 
+                grid
+            )
+            # Log path calculation for debugging
+            if len(self.path) > 0:
+                logger.info("%s A* path calculated. Steps: %d. Next: %s", self.type_name, len(self.path), self.path[0])
+            else:
+                logger.warning("%s detected player but NO PATH found!", self.type_name)
+        else:
+            # No player nearby - patrol
+            if self.state == "HUNTING":
+                # Just lost the player, return to patrol
+                logger.info("%s lost player (dist %.1f). Switching to PATROL", self.type_name, dist)
+                self.state = "PATROL"
+                self.path = []
+            
+            self._update_patrol(grid, pathfinding)
     
     def attack_player(self, player: 'Player') -> int:
         """
@@ -131,36 +152,6 @@ class Enemy(BaseEntity):
         damage = player.take_damage(self.damage)
         self.attack_cooldown = 1.0  # 1 second cooldown
         return damage
-
-        # Manhattan distance check for detection
-        dist = abs(self.x - player.x) + abs(self.y - player.y)
-        
-        if dist < self.detection_range:
-            # Player detected - hunt them!
-            if self.state != "HUNTING":
-                logger.info("%s spotted player at dist %.1f! Switching to HUNTING", self.type_name, dist)
-                self.state = "HUNTING"
-            
-            # Recalculate path
-            self.path = pathfinding.a_star(
-                (int(self.x), int(self.y)), 
-                (int(player.x), int(player.y)), 
-                grid
-            )
-            # Log heavily to debug "not moving"
-            if len(self.path) > 0:
-                logger.info("%s path calculated. Steps: %d. Next: %s", self.type_name, len(self.path), self.path[0])
-            else:
-                 logger.warning("%s detected player but NO PATH found!", self.type_name)
-        else:
-            # No player nearby - patrol
-            if self.state == "HUNTING":
-                # Just lost the player, return to patrol
-                logger.info("%s lost player (dist %.1f). Switching to PATROL", self.type_name, dist)
-                self.state = "PATROL"
-                self.path = []
-            
-            self._update_patrol(grid, pathfinding)
     
     def _update_patrol(self, grid: 'Grid', pathfinding: 'Pathfinding') -> None:
         """Update patrol behavior."""

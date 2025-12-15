@@ -146,6 +146,27 @@ class PlayingState(BaseState):
         if self.engine.enemy_timer > 0.1:
             self.engine.enemy_timer = 0.0
         
+        # Grant resources for killed enemies before removing them
+        for enemy in self.engine.enemies:
+            if enemy.is_dead:
+                # Resource drop based on enemy type
+                resource_drops = {
+                    'security_agent': 10,
+                    'elf': 20,
+                    'alpha_bear': 12
+                }
+                drop_amount = resource_drops.get(enemy.enemy_type, 10)
+                self.engine.player.resources += drop_amount
+                
+                # Show resource pickup notification at player position (more visible)
+                self.engine.damage_manager.add(
+                    self.engine.player.x, self.engine.player.y,
+                    f"+{drop_amount} DATA",
+                    color=(50, 255, 50),  # Green for resources
+                    is_crit=True  # Make it larger
+                )
+                logger.info("Enemy %s killed! Gained %d resources", enemy.type_name, drop_amount)
+        
         # Remove dead enemies
         self.engine.enemies = [e for e in self.engine.enemies if not e.is_dead]
         

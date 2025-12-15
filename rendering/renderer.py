@@ -64,11 +64,30 @@ class Renderer:
         self._render_enemy_paths(screen, enemies, camera, world_offset)
     
     def _render_enemy_paths(self, screen, enemies, camera, world_offset):
-        """Render path lines for all enemies."""
+        """
+        Render A* path lines for all enemies.
+        Showcases A* pathfinding algorithm visualization for AI course.
+        """
         for enemy in enemies:
+            # Draw detection radius (territory visualization)
+            self._render_detection_radius(screen, enemy, camera, world_offset)
+            
+            # Draw state indicator above enemy
+            self._render_enemy_state(screen, enemy, camera, world_offset)
+            
             if not enemy.path:
                 continue
                 
+            # Path color based on state: Red for hunting, Yellow for patrol
+            if enemy.state == "HUNTING":
+                path_color = (255, 50, 50)  # Bright red
+                node_color = (255, 100, 100)
+                line_width = 4
+            else:
+                path_color = (255, 200, 50)  # Yellow
+                node_color = (255, 220, 100)
+                line_width = 2
+            
             # Start from enemy current position
             start_iso = camera.cart_to_iso(enemy.x, enemy.y)
             start_pt = (
@@ -86,10 +105,97 @@ class Renderer:
                 )
                 points.append(pt)
             
+            # Draw path lines (thicker for hunting)
             if len(points) > 1:
-                pygame.draw.lines(screen, (255, 0, 0), False, points, 2)
-                for pt in points:
-                     pygame.draw.circle(screen, (255, 0, 0), (int(pt[0]), int(pt[1])), 3)
+                pygame.draw.lines(screen, path_color, False, points, line_width)
+                
+                # Draw nodes along path
+                for i, pt in enumerate(points):
+                    node_size = 6 if i == len(points) - 1 else 4  # Larger target node
+                    pygame.draw.circle(screen, node_color, (int(pt[0]), int(pt[1])), node_size)
+                    pygame.draw.circle(screen, (0, 0, 0), (int(pt[0]), int(pt[1])), node_size, 1)
+                
+                # Draw arrow head at end to show direction
+                if len(points) >= 2:
+                    self._draw_arrow_head(screen, points[-2], points[-1], path_color)
+    
+    def _render_detection_radius(self, screen, enemy, camera, world_offset):
+        """
+        Render enemy detection radius as a circle.
+        Only shows when player has entered territory (HUNTING state).
+        """
+        # Only show radius when enemy is actively hunting
+        if enemy.state != "HUNTING":
+            return
+            
+        # Get center position
+        iso = camera.cart_to_iso(enemy.x, enemy.y)
+        center_x = iso[0] + world_offset[0] + camera.x + 32
+        center_y = iso[1] + world_offset[1] + camera.y + 16
+        
+        # Calculate radius in screen pixels (approximate)
+        detection_range = getattr(enemy, 'detection_range', 8)
+        radius_px = int(detection_range * TILE_WIDTH * CAMERA_ZOOM / 4)
+        
+        # Red color for hunting state
+        color = (255, 50, 50, 60)
+        border_color = (255, 50, 50)
+        
+        # Create transparent surface for filled circle
+        radius_surf = pygame.Surface((radius_px * 2, radius_px * 2), pygame.SRCALPHA)
+        pygame.draw.circle(radius_surf, color, (radius_px, radius_px), radius_px)
+        screen.blit(radius_surf, (center_x - radius_px, center_y - radius_px))
+        
+        # Draw border
+        pygame.draw.circle(screen, border_color, (int(center_x), int(center_y)), radius_px, 2)
+    
+    def _render_enemy_state(self, screen, enemy, camera, world_offset):
+        """Render enemy state text above enemy."""
+        iso = camera.cart_to_iso(enemy.x, enemy.y)
+        x = iso[0] + world_offset[0] + camera.x + 16
+        y = iso[1] + world_offset[1] + camera.y - int(ELEVATION_OFFSET * CAMERA_ZOOM) - 30
+        
+        # State text and color
+        state = getattr(enemy, 'state', 'IDLE')
+        if state == "HUNTING":
+            color = (255, 80, 80)
+            text = "HUNTING (A*)"
+        elif state == "PATROL":
+            color = (255, 200, 80)
+            text = "PATROL"
+        else:
+            color = (150, 150, 150)
+            text = "IDLE"
+        
+        font = pygame.font.Font(None, 20)
+        text_surf = font.render(text, True, color)
+        text_rect = text_surf.get_rect(center=(x + 16, y))
+        
+        # Background for readability
+        bg_rect = text_rect.inflate(6, 4)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+        screen.blit(text_surf, text_rect)
+    
+    def _draw_arrow_head(self, screen, start, end, color):
+        """Draw arrow head pointing from start to end."""
+        import math
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = math.sqrt(dx*dx + dy*dy)
+        if length == 0:
+            return
+        
+        # Normalize
+        dx, dy = dx/length, dy/length
+        
+        # Arrow head size
+        size = 10
+        
+        # Points for arrow head
+        left = (end[0] - size*dx + size*0.5*dy, end[1] - size*dy - size*0.5*dx)
+        right = (end[0] - size*dx - size*0.5*dy, end[1] - size*dy + size*0.5*dx)
+        
+        pygame.draw.polygon(screen, color, [end, left, right])
     
     def _render_floor(self, screen, sx, sy):
         """Render floor tile."""

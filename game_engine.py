@@ -110,7 +110,13 @@ class GameEngine:
         self.state_machine.transition_to(StateType.MAIN_MENU)
     
     def init_level(self, level_num: int) -> None:
-        """Initialize a new level."""
+        """Initialize a new level with randomized positions."""
+        import random
+        import time
+        
+        # Seed random with current time for truly random positions each run/level
+        random.seed(time.time())
+        
         config = get_level_config(level_num)
         if config is None:
             logger.info("No more levels - victory!")
@@ -144,10 +150,18 @@ class GameEngine:
         self.player = Player(spawn_x, spawn_y)
         self.player.resources = config.start_resources
         
-        # Exit spawns at farthest point from player in the region
+        # Exit spawns at a random position far from player (not always the farthest)
         if largest_region:
-            sorted_by_dist = sorted(largest_region, key=lambda p: abs(p[0]-spawn_x) + abs(p[1]-spawn_y), reverse=True)
-            exit_x, exit_y = sorted_by_dist[0]
+            # Get candidates that are at least half the map away from player
+            far_candidates = [p for p in largest_region 
+                            if abs(p[0]-spawn_x) + abs(p[1]-spawn_y) > config.grid_size // 2]
+            if far_candidates:
+                # Randomly pick from far candidates for variety
+                exit_x, exit_y = random.choice(far_candidates)
+            else:
+                # Fallback to farthest point
+                sorted_by_dist = sorted(largest_region, key=lambda p: abs(p[0]-spawn_x) + abs(p[1]-spawn_y), reverse=True)
+                exit_x, exit_y = sorted_by_dist[0]
             exit_tile = self.grid.get_tile(exit_x, exit_y)
             if exit_tile:
                 exit_tile.type = 'exit'
@@ -157,20 +171,29 @@ class GameEngine:
         # Place resources in the connected region
         self.grid.place_resources(config.resource_count)
         
-        # Create enemies in the connected region (far from player)
+        # Create enemies at random positions (far from player)
         self.enemies = []
-        enemy_index = 0
-        enemy_spawn_candidates = sorted(largest_region, key=lambda p: abs(p[0]-spawn_x) + abs(p[1]-spawn_y), reverse=True) if largest_region else []
+        if largest_region:
+            # Get candidates far from player and exit
+            enemy_candidates = [p for p in largest_region 
+                               if abs(p[0]-spawn_x) + abs(p[1]-spawn_y) > config.grid_size // 3]
+            # Remove exit position from candidates
+            if (exit_x, exit_y) in enemy_candidates:
+                enemy_candidates.remove((exit_x, exit_y))
+            # Shuffle for randomness
+            random.shuffle(enemy_candidates)
+        else:
+            enemy_candidates = []
         
+        enemy_index = 0
         for enemy_type, count in config.enemies:
             for i in range(count):
-                if enemy_spawn_candidates:
-                    # Pick from far end of region
-                    idx = min(enemy_index * 5, len(enemy_spawn_candidates) - 1)
-                    ex, ey = enemy_spawn_candidates[idx]
+                if enemy_candidates and enemy_index < len(enemy_candidates):
+                    ex, ey = enemy_candidates[enemy_index]
                 else:
-                    ex = self.grid.width - 3 - enemy_index * 2
-                    ey = self.grid.height - 3 - enemy_index * 2
+                    # Fallback positions
+                    ex = random.randint(3, self.grid.width - 4)
+                    ey = random.randint(3, self.grid.height - 4)
                 
                 enemy = Enemy(ex, ey, enemy_type=enemy_type)
                 self.enemies.append(enemy)
